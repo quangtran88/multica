@@ -3535,6 +3535,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 		SpaceID:                          task.SpaceID,
 		SpaceKey:                         task.SpaceKey,
 		SpaceName:                        task.SpaceName,
+		SpaceDescription:                 task.SpaceDescription,
 		ProjectID:                        task.ProjectID,
 		ProjectTitle:                     task.ProjectTitle,
 		ProjectDescription:               task.ProjectDescription,
