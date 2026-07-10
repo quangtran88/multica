@@ -28,6 +28,7 @@ import {
   workspaceListOptions,
 } from "@multica/core/workspace/queries";
 import { api } from "@multica/core/api";
+import { activeSpaceListOptions, spaceKeys } from "@multica/core/spaces/queries";
 import {
   paths,
   resolvePostAuthDestination,
@@ -37,6 +38,7 @@ import {
 import { setCurrentWorkspace } from "@multica/core/platform";
 import type { Workspace } from "@multica/core/types";
 import { AvatarUploadControl } from "../../common/avatar-upload-control";
+import { SpacePicker } from "../../spaces/components/space-picker";
 import { useNavigation } from "../../navigation";
 import { DeleteWorkspaceDialog } from "./delete-workspace-dialog";
 import { useT } from "../../i18n";
@@ -54,6 +56,10 @@ export function WorkspaceTab() {
   const wsId = workspace?.id;
   const { data: members = [], isFetched: membersFetched } = useQuery({
     ...memberListOptions(wsId ?? ""),
+    enabled: !!wsId,
+  });
+  const { data: spaces = [] } = useQuery({
+    ...activeSpaceListOptions(wsId ?? ""),
     enabled: !!wsId,
   });
   const qc = useQueryClient();
@@ -108,6 +114,7 @@ export function WorkspaceTab() {
   const [slug, setSlug] = useState(workspace?.slug ?? "");
   const [description, setDescription] = useState(workspace?.description ?? "");
   const [context, setContext] = useState(workspace?.context ?? "");
+  const [defaultSpaceId, setDefaultSpaceId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
@@ -146,6 +153,11 @@ export function WorkspaceTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on id only; see comment above
   }, [workspace?.id]);
 
+  const configuredDefaultSpaceId = spaces.find((space) => space.is_default)?.id ?? null;
+  useEffect(() => {
+    setDefaultSpaceId(configuredDefaultSpaceId);
+  }, [workspace?.id, configuredDefaultSpaceId]);
+
   const performSave = async () => {
     if (!workspace) return;
     const previousSlug = workspace.slug;
@@ -156,10 +168,14 @@ export function WorkspaceTab() {
         slug: normalizedSlug,
         description,
         context,
+        ...(defaultSpaceId ? { default_space_id: defaultSpaceId } : {}),
       });
       qc.setQueryData(workspaceKeys.list(), (old: Workspace[] | undefined) =>
         old?.map((ws) => (ws.id === updated.id ? updated : ws)),
       );
+      if (wsId) {
+        await qc.invalidateQueries({ queryKey: spaceKeys.all(wsId) });
+      }
       if (updated.slug !== previousSlug) {
         setCurrentWorkspace(updated.slug, updated.id);
         navigation.replace(paths.workspace(updated.slug).settings());
@@ -294,6 +310,20 @@ export function WorkspaceTab() {
                 className="mt-1 resize-none"
                 placeholder={t(($) => $.workspace.context_placeholder)}
               />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">{t(($) => $.workspace.default_space_label)}</Label>
+              <div className="mt-1 flex h-9 items-center rounded-md border px-3 text-sm">
+                <SpacePicker
+                  spaceId={defaultSpaceId}
+                  onChange={setDefaultSpaceId}
+                  disabled={!canManageWorkspace}
+                  filter={(space) => space.visibility === "open"}
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(($) => $.workspace.default_space_hint)}
+              </p>
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">{t(($) => $.workspace.slug_label)}</Label>
